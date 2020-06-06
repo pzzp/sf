@@ -80,6 +80,17 @@ Proof.
     discriminate E.
 Qed.
 
+Lemma t_update_neq:
+  forall (A: Type) (m: total_map A) x y v,
+    x <> y -> (x !-> v; m) y = m y.
+Proof.
+  intros.
+  unfold t_update.
+  apply eqb_string_false_iff in H.
+  rewrite H.
+  reflexivity.
+Qed.
+
 Lemma eqb_stringP: forall x y: string,
   reflect (x = y) (eqb_string x y).
 Proof.
@@ -103,6 +114,7 @@ Proof.
   - reflexivity. 
 Qed.
 
+
 Theorem t_update_permute:
   forall (A: Type) (m: total_map A) v1 v2 x1 x2,
     x2 <> x1 ->
@@ -120,6 +132,11 @@ Proof.
   - reflexivity. 
 Qed.
 
+Lemma t_update_shadow : forall A (m: total_map A) v1 v2 x,
+    t_update (t_update m x v1) x v2
+  = t_update m x v2.
+Proof.
+  (* FILL IN HERE *) Admitted.
 
 
 Definition partial_map (A: Type) :=

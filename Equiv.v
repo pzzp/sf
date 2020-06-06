@@ -254,11 +254,35 @@ Proof.
     apply Hx.
 Qed.
 
+Check E_Ass.
+
 Theorem assign_aequiv : forall (x : string) e,
   aequiv x e ->
   cequiv SKIP (x ::= e).
 Proof.
-  Admitted.
+  unfold aequiv. unfold cequiv.
+  split.
+  - intros.
+    inversion H0. subst.
+    assert (H1: st' = t_update st' x (st' x)).
+    + apply functional_extensionality.
+      intros.
+      rewrite t_update_same. reflexivity.
+    + rewrite H1 in |- * at 2.
+      apply E_Ass.
+      rewrite <- H.
+      reflexivity.
+  - intros.
+    inversion H0. subst.
+    assert (H1: st = t_update st x (aeval st e)).
+    + rewrite <- H in |- * at 1.
+      apply functional_extensionality.
+      intros.
+      rewrite t_update_same. reflexivity.
+    + rewrite <- H1. 
+      apply E_Skip.
+Qed.
+
 
 Definition prog_a : com :=
   (WHILE ~(X <= 0) DO
@@ -422,14 +446,37 @@ Theorem CSeq_congruence : forall c1 c1' c2 c2',
   cequiv c1 c1' -> cequiv c2 c2' ->
   cequiv (c1;;c2) (c1';;c2').
 Proof.
-   Admitted.
+  split; intros;
+  inversion H1; subst.
+  - apply E_Seq with st'0.
+    + apply H. apply H4.
+    + apply H0. apply H7.
+  - apply E_Seq with st'0.
+    + apply H. apply H4.
+    + apply H0. apply H7.
+Qed.
 
 Theorem CIf_congruence : forall b b' c1 c1' c2 c2',
   bequiv b b' -> cequiv c1 c1' -> cequiv c2 c2' ->
   cequiv (TEST b THEN c1 ELSE c2 FI)
          (TEST b' THEN c1' ELSE c2' FI).
 Proof.
-   Admitted.
+  split; intros.
+  - inversion H2; subst.
+    + apply E_IfTrue.
+      * rewrite (H st) in H8. apply H8.
+      * rewrite (H0 st) in H9. apply H9. 
+    + apply E_IfFalse.
+      * rewrite (H st) in H8. apply H8.
+      * rewrite (H1 st) in H9. apply H9.
+  - inversion H2; subst.
+    + apply E_IfTrue.
+      * rewrite <- (H st) in H8. apply H8. 
+      * rewrite <- (H0 st) in H9. apply H9. 
+    + apply E_IfFalse.
+      * rewrite <- (H st) in H8. apply H8.
+      * rewrite <- (H1 st) in H9. apply H9.
+Qed.
 
 Example congruence_example:
   cequiv
@@ -502,6 +549,8 @@ Example fold_aexp_ex1 :
     fold_constants_aexp ((1 + 2) * X)
   = (3 * X)%imp.
 Proof. reflexivity. Qed.
+
+Compute fold_constants_aexp (1 + 2).
 
 Example fold_aexp_ex2 :
   fold_constants_aexp (X - ((0 * 6) + Y))%imp = (X - (0 + Y))%imp.
@@ -631,11 +680,16 @@ Proof.
     replace (aeval st a2) with (aeval st a2') by
        (subst a2'; rewrite <- fold_constants_aexp_sound; reflexivity).
     destruct a1'; destruct a2'; try reflexivity.
-
-    
       simpl. destruct (n =? n0); reflexivity.
-  - 
-     admit.
+  - simpl.
+    remember (fold_constants_aexp a1) as a1' eqn: Hlea1'.
+    remember (fold_constants_aexp a2) as a2' eqn: Hlea2'.
+    replace (aeval st a1) with (aeval st a1').
+    replace (aeval st a2) with (aeval st a2').
+    destruct a1'; destruct a2'; try reflexivity.
+    * simpl. destruct (n <=? n0); reflexivity.
+    * subst. rewrite <- fold_constants_aexp_sound. reflexivity. 
+    * subst. rewrite <- fold_constants_aexp_sound. reflexivity. 
   - 
     simpl. remember (fold_constants_bexp b) as b' eqn:Heqb'.
     rewrite IHb.
@@ -646,7 +700,7 @@ Proof.
     remember (fold_constants_bexp b2) as b2' eqn:Heqb2'.
     rewrite IHb1. rewrite IHb2.
     destruct b1'; destruct b2'; reflexivity.
- Admitted.
+Qed.
 
 Theorem fold_constants_com_sound :
   ctrans_sound fold_constants_com.
@@ -669,8 +723,15 @@ Proof.
     + 
       apply trans_cequiv with c2; try assumption.
       apply TEST_false; assumption.
-  - 
-     Admitted.
+  - remember (fold_constants_bexp b).
+    assert (bequiv b b0).
+    + rewrite Heqb0. apply fold_constants_bexp_sound.
+    + destruct b0; try (apply CWhile_congruence; assumption; assumption).
+      * apply WHILE_true. assumption.
+      * apply WHILE_false. assumption.
+Qed.
+     
+   
 
 Fixpoint subst_aexp (x : string) (u : aexp) (a : aexp) : aexp :=
   match a with
@@ -743,16 +804,34 @@ Inductive var_not_used_in_aexp (x : string) : aexp -> Prop :=
       var_not_used_in_aexp x a2 ->
       var_not_used_in_aexp x (AMult a1 a2).
 
+
 Lemma aeval_weakening : forall x st a ni,
   var_not_used_in_aexp x a ->
   aeval (x !-> ni ; st) a = aeval st a.
 Proof.
-   Admitted.
+  intros.
+  induction H.
+  - simpl. reflexivity.
+  - simpl. apply t_update_neq. apply H.
+  - simpl. 
+    rewrite IHvar_not_used_in_aexp1.
+    rewrite IHvar_not_used_in_aexp2.
+    reflexivity.
+  - simpl.
+    rewrite IHvar_not_used_in_aexp1.
+    rewrite IHvar_not_used_in_aexp2.
+    reflexivity.
+  - simpl.
+    rewrite IHvar_not_used_in_aexp1.
+    rewrite IHvar_not_used_in_aexp2.
+    reflexivity.
+Qed.
+
 
 Theorem inequiv_exercise:
   ~ cequiv (WHILE true DO SKIP END) SKIP.
 Proof.
-   Admitted.
+  Admitted.
 
 Module Himp.
 
@@ -806,18 +885,23 @@ Inductive ceval : com -> state -> state -> Prop :=
       st  =[ c ]=> st' ->
       st' =[ WHILE b DO c END ]=> st'' ->
       st  =[ WHILE b DO c END ]=> st''
-
+  | E_Havoc: forall x st v,
+      st =[ CHavoc x ]=> (x !-> v; st)
   where "st =[ c ]=> st'" := (ceval c st st').
 Close Scope imp_scope.
 
 Example havoc_example1 : empty_st =[ (HAVOC X)%imp ]=> (X !-> 0).
 Proof.
- Admitted.
+  apply E_Havoc.
+Qed.
 
 Example havoc_example2 :
   empty_st =[ (SKIP;; HAVOC Z)%imp ]=> (Z !-> 42).
 Proof.
- Admitted.
+  apply E_Seq with (empty_st).
+  - apply E_Skip.
+  - apply E_Havoc.
+Qed.
 
 Definition manual_grade_for_Check_rule_for_HAVOC : option (nat*string) := None.
 
@@ -832,7 +916,34 @@ Definition pYX :=
 
 Theorem pXY_cequiv_pYX :
   cequiv pXY pYX \/ ~cequiv pXY pYX.
-Proof.  Admitted.
+Proof.  
+  left.
+  unfold cequiv.
+  intros.
+  split.
+  - intros.
+    inversion H. subst.
+    inversion H2. subst.
+    inversion H5. subst.
+    apply E_Seq with (Y !-> v0; st).
+    + apply E_Havoc.
+    + rewrite t_update_permute.
+      * apply E_Havoc.
+      * unfold not.
+        intros.
+        discriminate.
+  - intros.
+    inversion H. subst.
+    inversion H2. subst.
+    inversion H5. subst.
+    apply E_Seq with (X !-> v0; st).
+    + apply E_Havoc.
+    + rewrite t_update_permute.
+      * apply E_Havoc.
+      * unfold not. intros. discriminate.
+Qed.
+
+
 
 Definition ptwice :=
   (HAVOC X;; HAVOC Y)%imp.
@@ -855,10 +966,13 @@ Definition p2 : com :=
     SKIP
   END)%imp.
 
+
+
+
 Lemma p1_may_diverge : forall st st', st X <> 0 ->
   ~ st =[ p1 ]=> st'.
-Proof.  Admitted.
-
+Proof.
+   Admitted. 
 Lemma p2_may_diverge : forall st st', st X <> 0 ->
   ~ st =[ p2 ]=> st'.
 Proof.
